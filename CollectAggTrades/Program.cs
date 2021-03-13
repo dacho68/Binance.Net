@@ -24,50 +24,8 @@ namespace CollectAggTrades
 
     }
 
-    static void Main(string[] args)
+    static void GetStreamDepth()
     {
-      var client = new BinanceClient(new BinanceClientOptions
-      {
-        ApiCredentials = new ApiCredentials("qzQApE9sTemaP6Qda3eGW4n3HLOfp1LaQ6Q4ZFS1kA7qTSOCVJeISD7G4JBQsR4b", "w0hkzxOyyB4ryGjR2aiAQtgqqBbydG8RQ2Zs5fNJCcJCH4rtiW5zs8fs7EQ7Yh6r")
-      });
-
-
-      var generalInfo = client.General.GetAccountInfo().Data;
-
-      Console.WriteLine("===== Spot account =========");
-      foreach (var bal in generalInfo.Balances)
-      {
-        if (bal.Free > (decimal)0.0)
-        {
-          Console.WriteLine(string.Format("{0} - {1}", bal.Asset, bal.Free));
-        }
-      }
-
-      //	var accStatus = client.General.GetAccountStatus().Data;
-
-      Console.WriteLine("===== Future account =========");
-      var futureAccountcSnapshot = client.General.GetDailyFutureAccountSnapshot().Data;
-      foreach (var sn in futureAccountcSnapshot)
-      {
-        foreach (var asset in sn.Data.Assets)
-        {
-          Console.WriteLine(string.Format("{0} {1}  Margin: {2} Wallet: {3}", sn.Timestamp.ToString(), asset.Asset, asset.MarginBalance, asset.WalletBalance));
-
-        }
-      }
-
-      ///  var log = new Log("test");
-      //  var opt = new BinanceSocketClientOptions();
-      //  //var wsclientfc = new BinanceSocketClient();
-      // wsclientfc.FuturesCoin.SubscribeToOrderBookUpdatesAsync()
-
-      var allPrice = client.FuturesCoin.Market.GetAllPrices();
-
-      foreach( var data in allPrice.Data)
-      {
-        Console.WriteLine($" {data.Symbol} : {data.Price} ");
-      }
-
       using (var wsclient = new BinanceSocketClient())
       {
         Console.WriteLine("Subscribe to future coin Depth Data");
@@ -81,15 +39,99 @@ namespace CollectAggTrades
           });
       }
 
+    }
+
+    static void GetAllFutureCoinSymbols(BinanceClient client)
+    {
+      var allPrice = client.FuturesCoin.Market.GetAllPrices();
+
+      foreach (var data in allPrice.Data)
+      {
+        Console.WriteLine($" {data.Symbol} : {data.Price} ");
+      }
+    }
+
+    static void Main(string[] args)
+    {
+      var client = new BinanceClient(new BinanceClientOptions
+      {
+        ApiCredentials = new ApiCredentials("qzQApE9sTemaP6Qda3eGW4n3HLOfp1LaQ6Q4ZFS1kA7qTSOCVJeISD7G4JBQsR4b", "w0hkzxOyyB4ryGjR2aiAQtgqqBbydG8RQ2Zs5fNJCcJCH4rtiW5zs8fs7EQ7Yh6r")
+      });
 
 
+      var generalInfo = client.General.GetAccountInfo().Data;
+#if USE_SPOT_ACCOUNT
+      Console.WriteLine("===== Spot account =========");
+      foreach (var bal in generalInfo.Balances)
+      {
+        if (bal.Free > (decimal)0.0)
+        {
+          Console.WriteLine(string.Format("{0} - {1}", bal.Asset, bal.Free));
+        }
+      }
+#endif
+      //	var accStatus = client.General.GetAccountStatus().Data;
+      
+      Console.WriteLine("===== Future account =========");
+#if USE_FUTURE_ACCOUNT
+      var futureAccountcSnapshot = client.General.   GetDailyFutureAccountSnapshot().Data;
+      foreach (var sn in futureAccountcSnapshot)
+      {
+        foreach (var asset in sn.Data.Assets)
+        {
+          Console.WriteLine(string.Format("{0} {1}  Margin: {2} Wallet: {3}", sn.Timestamp.ToString(), asset.Asset, asset.MarginBalance, asset.WalletBalance));
+
+        }
+      }
+#endif
+//#if USE_FUTURE_COIN_SYMB
+      GetAllFutureCoinSymbols(client);
+//#endif
+
+
+      ///  var log = new Log("test");
+      //  var opt = new BinanceSocketClientOptions();
+      //  //var wsclientfc = new BinanceSocketClient();
+      // wsclientfc.FuturesCoin.SubscribeToOrderBookUpdatesAsync()
+      var startResult = client.Spot.UserStream.StartUserStream();
+
+      //      if (!startResult.Success)
+      //        throw new Exception($"Failed to start spot user stream: {startResult.Error}");
+
+
+//      startResult = client.FuturesCoin.UserStream.StartUserStream();
+//if (!startResult.Success)
+//      throw new Exception($"Failed to start FuturesCoin user stream: {startResult.Error}");
+
+#if USE_ORDERBOOK
+      using (var wsclient = new BinanceSocketClient())
+      {
+        var successTrades = wsclient.FuturesCoin.SubscribeToOrderBookUpdatesAsync("ethusd_perp", 500, (msg) => {
+        Console.WriteLine($" {msg.Symbol}");
+          foreach(var ask in msg.Asks)
+            Console.WriteLine( $"ask:{ask.Price} {ask.Quantity}");
+          foreach(var bid in msg.Bids)
+            Console.WriteLine($"bid:{bid.Price} {bid.Quantity}");
+
+        });
+      }
+#endif
+
+#if USE_AGGTRADE
+      using (var wsclient = new BinanceSocketClient())
+      {
+
+        var successTrades = wsclient.FuturesCoin.SubscribeToAggregatedTradeUpdatesAsync("adausd_perp",  (msg) => {
+          Console.WriteLine($" {msg.Symbol} price:{msg.Price} Q:{msg.Quantity} BuyerMaker:{msg.BuyerIsMaker}");
+        });
+      }
+#endif
 
       // future transactions
-      /*
       using (var wsclient = new BinanceSocketClient())
       {
         Console.WriteLine("Subscribe to User Data");
-        var successTrades = wsclient.FuturesCoin.SubscribeToUserDataUpdatesAsync("ethusdt",
+        var successTrades = wsclient.FuturesCoin.SubscribeToUserDataUpdatesAsync("adause_perp",
         (marginData) =>
         {
           foreach (var pos in marginData.Positions)
@@ -119,7 +161,7 @@ namespace CollectAggTrades
         {
           Console.WriteLine("UserStream Start");
         }
-        */
+      }
 
 
       //var socketClient = new BinanceSocketClient();
